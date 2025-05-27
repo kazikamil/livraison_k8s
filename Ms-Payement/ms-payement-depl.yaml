@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ms-payement-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ms-payement-pod
+  template:
+    metadata:
+      labels:
+        app: ms-payement-pod
+    spec:
+      containers:
+        - name: ms-payement-container
+          image: 192.168.3.1:5000/ms-payement
+          ports:
+            - containerPort: 5000
+          env:
+            - name: DB_NAME
+              value: bdd_payement
+            - name: DB_USER
+              value: root
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: ROOT_PASSWORD
+            - name: DB_HOST
+              value: mysql-with-secret-srv
+            - name: api_key
+              value: "test_sk_yMmtUeMKCzJBFrz4RHzgxdJi4K1bgEyW9nAj3I34"
+            - name: mode
+              value: test
+            - name: PORT
+              value: "5000"
+          imagePullPolicy: Always
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ms-payement
+spec:
+  selector:
+    app: ms-payement-pod
+  ports:
+    - port: 5000
+      targetPort: 5000
+      nodePort: 30016
+  type: NodePort

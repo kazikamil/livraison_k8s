@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ms-commande-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ms-commande-pod
+  template:
+    metadata:
+      labels:
+        app: ms-commande-pod
+    spec:
+      containers:
+        - name: ms-commande-container
+          image: 192.168.3.1:5000/ms-commande
+          ports:
+            - containerPort: 5000
+          env:
+            - name: MONGO_URI
+              value: mongodb://mongo-service:27017/
+            - name: CLOUDINARY_CLOUD_NAME
+              value: 'dik7ohyhp'
+            - name: CLOUDINARY_API_SECRET
+              value: NX2AtVyT_tk0sy3jCKf4i_opq28
+            - name: CLOUDINARY_API_KEY
+              value: '937739513343689'
+            - name: PORT
+              value: "5000"
+          imagePullPolicy: Always
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ms-commande
+spec:
+  selector:
+    app: ms-commande-pod
+  ports:
+    - port: 5000
+      targetPort: 5000
+      nodePort: 30021
+  type: NodePort

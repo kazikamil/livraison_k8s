@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongo-optimization-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongo-opt-pod
+  template:
+    metadata:
+      labels:
+        app: mongo-opt-pod
+    spec:
+      containers:
+        - image: mongo:4.4
+          name: mongo-container
+          ports:
+            - containerPort: 27017
+          volumeMounts:
+            - name: mongo-persistent-storage
+              mountPath: /data/db        
+      volumes:
+        - name: mongo-persistent-storage
+          persistentVolumeClaim:
+            claimName: mongo-opt-pv-claim  # Reference the PVC name
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo-service
+spec:
+  ports:
+    - port: 27017
+      targetPort: 27017
+      nodePort: 30018
+      
+  selector:
+    app: mongo-opt-pod
+    
+  type: NodePort
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mongo-pv-opt
+spec:
+  capacity:
+    storage: 100Mi
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: manual
+  hostPath:
+    path: "/mnt/data/mongo"  # Ensure this path exists on the node
+
+
+
+    
+
+---
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongo-opt-pv-claim
+spec:  
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 100Mi
+    storageClassName: manual # Must match the PV storageClass
+

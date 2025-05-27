@@ -1,0 +1,178 @@
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kafka
+---
+# 1) ZOOKEEPER
+
+# Service headless pour l’ensemble
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper
+  namespace: kafka
+  labels:
+    app: zookeeper
+spec:
+  ports:
+    - name: client
+      port: 2181
+  clusterIP: None
+  selector:
+    app: zookeeper
+---
+# StatefulSet ZooKeeper
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: zookeeper
+  namespace: kafka
+spec:
+  serviceName: zookeeper
+  replicas: 3
+  selector:
+    matchLabels:
+      app: zookeeper
+  template:
+    metadata:
+      labels:
+        app: zookeeper
+    spec:
+      containers:
+        - name: zookeeper
+          image: confluentinc/cp-zookeeper:7.5.0
+          ports:
+            - name: client
+              containerPort: 2181
+          env:
+            - name: ZOOKEEPER_SERVER_ID
+              # ID numérique extrait du pod name suffixe (0,1,2)
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: ZOOKEEPER_CLIENT_PORT
+              value: "2181"
+            - name: ZOOKEEPER_TICK_TIME
+              value: "2000"
+            - name: ZOOKEEPER_INIT_LIMIT
+              value: "10"
+            - name: ZOOKEEPER_SYNC_LIMIT
+              value: "5"
+            - name: ZOOKEEPER_SERVERS
+              value: >
+                zookeeper-0.zookeeper:2888:3888;zookeeper-1.zookeeper:2888:3888;zookeeper-2.zookeeper:2888:3888
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/zookeeper/data
+            - name: log
+              mountPath: /var/lib/zookeeper/log
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 5Gi
+    - metadata:
+        name: log
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 2Gi
+
+---
+# 2) KAFKA
+
+# Service headless pour les brokers
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  namespace: kafka
+  labels:
+    app: kafka
+spec:
+  ports:
+    - name: broker
+      port: 9092
+  clusterIP: None
+  selector:
+    app: kafka
+---
+# Service bootstrap pour clients
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-bootstrap
+  namespace: kafka
+spec:
+  ports:
+    - name: broker
+      port: 9092
+  selector:
+    app: kafka
+---
+# StatefulSet Kafka
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kafka
+  namespace: kafka
+spec:
+  serviceName: kafka
+  replicas: 3
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      containers:
+        - name: kafka
+          image: confluentinc/cp-kafka:7.5.0
+          ports:
+            - name: broker
+              containerPort: 9092
+          env:
+            - name: KAFKA_BROKER_ID
+              # ID numérique = suffixe du pod (0, 1, 2)
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: KAFKA_ZOOKEEPER_CONNECT
+              value: zookeeper:2181
+            - name: KAFKA_LISTENERS
+              value: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:9094
+            - name: KAFKA_ADVERTISED_LISTENERS
+              value: |
+                INTERNAL://kafka-$(hostname).kafka.svc.cluster.local:9092,
+                EXTERNAL://$(MY_EXTERNAL_HOST):9094
+            - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+              value: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+            - name: KAFKA_INTER_BROKER_LISTENER_NAME
+              value: INTERNAL
+            - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+              value: "3"
+            - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
+              value: "2"
+            - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
+              value: "3"
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/kafka/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 10Gi

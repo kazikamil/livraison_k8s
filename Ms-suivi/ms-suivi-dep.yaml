@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ms-suivi-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ms-suivi-pod
+  template:
+    metadata:
+      labels:
+        app: ms-suivi-pod
+    spec:
+      containers:
+        - name: ms-suivi-container
+          image: 192.168.3.1:5000/ms-suivi
+          ports:
+            - containerPort: 5000
+          env:
+            - name: MONGO_URI
+              value: mongodb://192.168.3.50:30018/  
+            - name: GRAPH_HOPPER_API_KEY
+              value: 74a01802-22a7-4f8a-9cb9-918852900cf7
+            - name: PORT
+              value: "5000"
+          imagePullPolicy: Always
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ms-suivi
+spec:
+  selector:
+    app: ms-suivi-pod
+  ports:
+    - port: 5000
+      targetPort: 5000
+      nodePort: 30020
+  type: NodePort

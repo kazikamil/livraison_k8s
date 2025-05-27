@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ms-user-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ms-user-pod
+  template:
+    metadata:
+      labels:
+        app: ms-user-pod
+    spec:
+      containers:
+        - name: ms-user-container
+          image: 192.168.3.1:5000/ms-user
+          ports:
+            - containerPort: 8082
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:mysql://mysql-with-secret-srv:3306/bdd-user
+            - name: SPRING_DATASOURCE_USERNAME
+              value: root
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: ROOT_PASSWORD
+            - name: SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT
+              value: org.hibernate.dialect.MySQL8Dialect
+            - name: SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID
+              value: "410856901212-6q8pkqunhg18ruq692pvumc339jb9em3.apps.googleusercontent.com"
+            - name: SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET
+              value: "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"
+            - name: SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_REDIRECT_URI
+              value: "http://192.168.3.100/service-user/login/oauth2/code/google"
+            - name: spring.kafka.bootstrap-servers
+              value: kafka:9092
+          imagePullPolicy: Always
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ms-user
+spec:
+  selector:
+    app: ms-user-pod
+  ports:
+    - port: 8082
+      targetPort: 8082
+      nodePort: 30012
+  type: NodePort
